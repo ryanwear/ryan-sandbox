@@ -62,10 +62,25 @@ function assertValidChanges(changes) {
 }
 
 /**
+ * Shallow-copy a stored card for handing to a caller.
+ *
+ * Every card-returning method hands out a copy so callers cannot bypass
+ * validation, change a stored id, or otherwise mutate internal state.
+ *
+ * @param {{ id: string, title: string, description: string, column: string }} card Stored card.
+ * @returns {{ id: string, title: string, description: string, column: string }} A detached copy.
+ */
+function copyCard(card) {
+  return { ...card };
+}
+
+/**
  * In-memory Kanban board.
  *
  * Cards are stored by unique id in insertion order. Every mutation validates
  * its inputs before changing state, so a failed call leaves the board intact.
+ * Card-returning methods hand out shallow copies, so mutating a returned
+ * object never reaches the board's internal state.
  */
 export class KanbanBoard {
   /** @type {Map<string, { id: string, title: string, description: string, column: string }>} */
@@ -77,7 +92,7 @@ export class KanbanBoard {
    * @param {string} title Card title; must pass `isValidCardTitle`.
    * @param {string} description Card description; may be empty.
    * @param {'To Do' | 'In Progress' | 'Done'} column Initial column.
-   * @returns {{ id: string, title: string, description: string, column: string }} The stored card.
+   * @returns {{ id: string, title: string, description: string, column: string }} A copy of the stored card.
    * @throws {TypeError} When the title, description, or column is invalid.
    */
   createCard(title, description, column) {
@@ -92,7 +107,7 @@ export class KanbanBoard {
 
     const card = { id, title, description, column };
     this.#cards.set(id, card);
-    return card;
+    return copyCard(card);
   }
 
   /**
@@ -100,10 +115,11 @@ export class KanbanBoard {
    *
    * @param {string} id Card id.
    * @returns {{ id: string, title: string, description: string, column: string } | undefined}
-   *   The card, or `undefined` when no card has that id.
+   *   A copy of the card, or `undefined` when no card has that id.
    */
   getCard(id) {
-    return this.#cards.get(id);
+    const card = this.#cards.get(id);
+    return card === undefined ? undefined : copyCard(card);
   }
 
   /**
@@ -114,7 +130,7 @@ export class KanbanBoard {
    * @param {string} id Card id.
    * @param {{ title?: string, description?: string, column?: string }} changes
    *   Fields to update; omitted fields keep their current value.
-   * @returns {{ id: string, title: string, description: string, column: string }} The updated card.
+   * @returns {{ id: string, title: string, description: string, column: string }} A copy of the updated card.
    * @throws {Error} When no card has the given id.
    * @throws {TypeError} When the payload or one of its fields is invalid.
    */
@@ -150,7 +166,7 @@ export class KanbanBoard {
       card.column = changes.column;
     }
 
-    return card;
+    return copyCard(card);
   }
 
   /**
@@ -158,7 +174,7 @@ export class KanbanBoard {
    *
    * @param {string} id Card id.
    * @param {'To Do' | 'In Progress' | 'Done'} newColumn Destination column.
-   * @returns {{ id: string, title: string, description: string, column: string }} The moved card.
+   * @returns {{ id: string, title: string, description: string, column: string }} A copy of the moved card.
    * @throws {Error} When no card has the given id.
    * @throws {TypeError} When the destination column is invalid.
    */
@@ -170,7 +186,7 @@ export class KanbanBoard {
 
     assertValidColumn(newColumn);
     card.column = newColumn;
-    return card;
+    return copyCard(card);
   }
 
   /**
@@ -187,10 +203,10 @@ export class KanbanBoard {
    * Get every card in insertion order.
    *
    * @returns {Array<{ id: string, title: string, description: string, column: string }>}
-   *   A new array containing all stored cards.
+   *   A new array containing copies of all stored cards.
    */
   getAllCards() {
-    return [...this.#cards.values()];
+    return [...this.#cards.values()].map(copyCard);
   }
 
   /**
@@ -198,12 +214,14 @@ export class KanbanBoard {
    *
    * @param {'To Do' | 'In Progress' | 'Done'} column Column to filter by.
    * @returns {Array<{ id: string, title: string, description: string, column: string }>}
-   *   A new array containing the matching cards.
+   *   A new array containing copies of the matching cards.
    * @throws {TypeError} When the column is invalid.
    */
   getCardsByColumn(column) {
     assertValidColumn(column);
-    return [...this.#cards.values()].filter((card) => card.column === column);
+    return [...this.#cards.values()]
+      .filter((card) => card.column === column)
+      .map(copyCard);
   }
 
   /**

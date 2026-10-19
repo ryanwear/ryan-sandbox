@@ -350,3 +350,141 @@ test("boards are independent of one another", () => {
   assert.deepEqual(second.getAllCards(), []);
   assert.equal(second.getCard(card.id), undefined);
 });
+
+test("card-returning methods never hand out the stored object", () => {
+  const board = new KanbanBoard();
+  const created = board.createCard("Original", "Description", "To Do");
+
+  assert.notEqual(board.getCard(created.id), created);
+  assert.notEqual(board.getAllCards()[0], created);
+  assert.notEqual(board.updateCard(created.id, { title: "Updated" }), board.getCard(created.id));
+  assert.notEqual(board.moveCard(created.id, "Done"), board.getCard(created.id));
+  assert.notEqual(board.getAllCards()[0], board.getCard(created.id));
+  assert.notEqual(board.getCardsByColumn("Done")[0], board.getCard(created.id));
+});
+
+test("mutating the object returned by createCard does not affect the board", () => {
+  const board = new KanbanBoard();
+  const created = board.createCard("Original", "Description", "To Do");
+  const originalId = created.id;
+
+  created.id = "tampered-id";
+  created.title = "";
+  created.description = 42;
+  created.column = "Bogus";
+
+  assert.deepEqual(board.getCard(originalId), {
+    id: originalId,
+    title: "Original",
+    description: "Description",
+    column: "To Do",
+  });
+  assert.equal(board.getCard("tampered-id"), undefined);
+  assert.equal(board.getAllCards().length, 1);
+});
+
+test("mutating the object returned by getCard does not affect the board", () => {
+  const board = new KanbanBoard();
+  const created = board.createCard("Original", "Description", "To Do");
+
+  const fetched = board.getCard(created.id);
+  fetched.id = "tampered-id";
+  fetched.title = "Tampered";
+  fetched.description = "Tampered";
+  fetched.column = "Done";
+
+  assert.deepEqual(board.getCard(created.id), {
+    id: created.id,
+    title: "Original",
+    description: "Description",
+    column: "To Do",
+  });
+  assert.deepEqual(board.getAllCards(), [
+    { id: created.id, title: "Original", description: "Description", column: "To Do" },
+  ]);
+  assert.equal(board.getCardsByColumn("To Do").length, 1);
+  assert.deepEqual(board.getCardsByColumn("Done"), []);
+});
+
+test("mutating the object returned by updateCard does not affect the board", () => {
+  const board = new KanbanBoard();
+  const created = board.createCard("Original", "Description", "To Do");
+
+  const updated = board.updateCard(created.id, { title: "Updated" });
+  updated.title = "Tampered";
+  updated.column = "Bogus";
+  updated.id = "tampered-id";
+
+  assert.deepEqual(board.getCard(created.id), {
+    id: created.id,
+    title: "Updated",
+    description: "Description",
+    column: "To Do",
+  });
+  assert.equal(board.getCard("tampered-id"), undefined);
+});
+
+test("mutating the object returned by moveCard does not affect the board", () => {
+  const board = new KanbanBoard();
+  const created = board.createCard("Original", "Description", "To Do");
+
+  const moved = board.moveCard(created.id, "Done");
+  moved.column = "To Do";
+  moved.title = "Tampered";
+
+  assert.deepEqual(board.getCard(created.id), {
+    id: created.id,
+    title: "Original",
+    description: "Description",
+    column: "Done",
+  });
+  assert.equal(board.getCardsByColumn("Done").length, 1);
+  assert.equal(board.getCardsByColumn("To Do").length, 0);
+});
+
+test("mutating elements of getAllCards does not affect the board", () => {
+  const board = new KanbanBoard();
+  const created = board.createCard("Original", "Description", "To Do");
+
+  const cards = board.getAllCards();
+  cards[0].id = "tampered-id";
+  cards[0].title = "";
+  cards[0].description = null;
+  cards[0].column = "Bogus";
+
+  assert.deepEqual(board.getAllCards(), [
+    { id: created.id, title: "Original", description: "Description", column: "To Do" },
+  ]);
+  assert.equal(board.getCard("tampered-id"), undefined);
+  assert.equal(board.getCardsByColumn("To Do").length, 1);
+});
+
+test("mutating elements of getCardsByColumn does not affect the board", () => {
+  const board = new KanbanBoard();
+  const created = board.createCard("Original", "Description", "To Do");
+
+  const cards = board.getCardsByColumn("To Do");
+  cards[0].id = "tampered-id";
+  cards[0].title = "";
+  cards[0].column = "Done";
+
+  assert.deepEqual(board.getAllCards(), [
+    { id: created.id, title: "Original", description: "Description", column: "To Do" },
+  ]);
+  assert.equal(board.getCard("tampered-id"), undefined);
+  assert.equal(board.getCardsByColumn("Done").length, 0);
+});
+
+test("external mutation cannot bypass validation on later updates", () => {
+  const board = new KanbanBoard();
+  const created = board.createCard("Original", "Description", "To Do");
+
+  const tampered = board.getCard(created.id);
+  tampered.column = "Bogus";
+  tampered.title = "   ";
+
+  assertThrowsMessage(() => board.updateCard(created.id, { title: "   " }), /title/i);
+  assertThrowsMessage(() => board.moveCard(created.id, "Bogus"), /column/i);
+  assert.equal(board.getCard(created.id).column, "To Do");
+  assert.equal(board.getCard(created.id).title, "Original");
+});
