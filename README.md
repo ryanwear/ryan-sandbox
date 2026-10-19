@@ -18,10 +18,13 @@ Then open <http://127.0.0.1:4173/>. Set `PORT` to use a different port:
 PORT=8080 npm start
 ```
 
-The app is fully static. If you already have a static file server, serve the
-repository root and open `index.html`; no build step or runtime dependency is
-needed. Opening the HTML file with a `file://` URL will not work because
-browser modules are blocked by CORS.
+The app is fully static. The included dev server serves only the public
+application files (`index.html`, `styles.css`, and the browser modules under
+`src/`); every other repository path, including `.git/`, tests, scripts, and
+configuration, returns 404. If you use a different static server, configure it
+to expose only those public files rather than the whole repository. Opening the
+HTML file with a `file://` URL will not work because browser modules are
+blocked by CORS.
 
 ## Features
 
@@ -50,7 +53,7 @@ browser modules are blocked by CORS.
 | `src/kanban-board.js` | Framework-free board engine, including `restoreCard`. |
 | `src/card-title-validator.js` | Shared card-title validation. |
 | `src/kanban-column-validator.js` | Shared column validation. |
-| `scripts/serve.js` | Dependency-free local static server. |
+| `scripts/serve.js` | Dependency-free local static server with a public-file allowlist. |
 | `test/` | Node.js built-in test suites. |
 
 ## Engine API
@@ -79,6 +82,8 @@ npm test
 The suite uses only `node:test` and `node:assert` and covers the validators,
 the engine, id generation including the no-Web-Crypto fallback, and storage
 round-trips, corrupt data, invalid entries, duplicate ids, and missing keys.
+Server tests cover the public-file allowlist, internal-file and traversal
+blocking, HTTP methods, content types, and index asset references.
 
 ## Persistence format
 
