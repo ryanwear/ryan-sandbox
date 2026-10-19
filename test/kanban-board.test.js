@@ -488,3 +488,134 @@ test("external mutation cannot bypass validation on later updates", () => {
   assert.equal(board.getCard(created.id).column, "To Do");
   assert.equal(board.getCard(created.id).title, "Original");
 });
+
+test("restoreCard hydrates a card while preserving its id", () => {
+  const board = new KanbanBoard();
+  const stored = {
+    id: "stored-card-id",
+    title: "Restored card",
+    description: "Loaded from local storage",
+    column: "In Progress",
+  };
+
+  const restored = board.restoreCard(stored);
+
+  assert.deepEqual(restored, stored);
+  assert.deepEqual(board.getCard("stored-card-id"), stored);
+  assert.deepEqual(board.getCardsByColumn("In Progress"), [stored]);
+});
+
+test("restoreCard preserves insertion order across restores and creates", () => {
+  const board = new KanbanBoard();
+
+  board.restoreCard({ id: "a", title: "First", description: "", column: "To Do" });
+  board.restoreCard({ id: "b", title: "Second", description: "", column: "Done" });
+  const created = board.createCard("Third", "", "To Do");
+
+  assert.deepEqual(
+    board.getAllCards().map((card) => card.id),
+    ["a", "b", created.id],
+  );
+});
+
+test("restoreCard rejects invalid fields without storing anything", () => {
+  const board = new KanbanBoard();
+  const valid = { id: "stored-id", title: "Valid", description: "", column: "To Do" };
+  const invalidCards = [
+    [{ ...valid, id: "" }, /id/i],
+    [{ ...valid, id: "   " }, /id/i],
+    [{ ...valid, id: 42 }, /id/i],
+    [{ ...valid, id: undefined }, /id/i],
+    [{ ...valid, title: "" }, /title/i],
+    [{ ...valid, title: "   " }, /title/i],
+    [{ ...valid, title: null }, /title/i],
+    [{ ...valid, description: undefined }, /description/i],
+    [{ ...valid, description: 42 }, /description/i],
+    [{ ...valid, column: "Todo" }, /column/i],
+    [{ ...valid, column: "" }, /column/i],
+    [{ ...valid, column: null }, /column/i],
+  ];
+
+  for (const [card, pattern] of invalidCards) {
+    assertThrowsMessage(() => board.restoreCard(card), pattern);
+  }
+
+  assert.deepEqual(board.getAllCards(), []);
+});
+
+test("restoreCard rejects non-object payloads", () => {
+  const board = new KanbanBoard();
+
+  for (const payload of [undefined, null, "card", 42, [], [{ id: "a" }]]) {
+    assertThrowsMessage(() => board.restoreCard(payload), /restore/i);
+  }
+
+  assert.deepEqual(board.getAllCards(), []);
+});
+
+test("restoreCard rejects duplicate ids without overwriting the original", () => {
+  const board = new KanbanBoard();
+  const original = board.restoreCard({
+    id: "duplicate-id",
+    title: "Original",
+    description: "Keep me",
+    column: "To Do",
+  });
+
+  assertThrowsMessage(
+    () =>
+      board.restoreCard({
+        id: "duplicate-id",
+        title: "Replacement",
+        description: "Should not win",
+        column: "Done",
+      }),
+    /already exists/i,
+  );
+
+  assert.deepEqual(board.getCard("duplicate-id"), original);
+  assert.equal(board.getAllCards().length, 1);
+});
+
+test("restoreCard rejects ids already created by createCard", () => {
+  const board = new KanbanBoard();
+  const created = board.createCard("Original", "Keep me", "To Do");
+
+  assertThrowsMessage(
+    () =>
+      board.restoreCard({
+        id: created.id,
+        title: "Replacement",
+        description: "Should not win",
+        column: "Done",
+      }),
+    /already exists/i,
+  );
+
+  assert.deepEqual(board.getCard(created.id), created);
+});
+
+test("restoreCard ignores extra properties and returns a detached copy", () => {
+  const board = new KanbanBoard();
+
+  const restored = board.restoreCard({
+    id: "extra-id",
+    title: "Extra",
+    description: "Properties",
+    column: "Done",
+    unexpected: "ignored",
+  });
+
+  assert.deepEqual(restored, {
+    id: "extra-id",
+    title: "Extra",
+    description: "Properties",
+    column: "Done",
+  });
+
+  restored.title = "Tampered";
+  restored.column = "To Do";
+
+  assert.equal(board.getCard("extra-id").title, "Extra");
+  assert.equal(board.getCard("extra-id").column, "Done");
+});

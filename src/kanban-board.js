@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
-
 import { isValidCardTitle } from "./card-title-validator.js";
+import { generateId } from "./id-generator.js";
 import { isValidKanbanColumn, VALID_COLUMNS } from "./kanban-column-validator.js";
 
 const VALID_COLUMN_LIST = [...VALID_COLUMNS].map((column) => JSON.stringify(column)).join(", ");
@@ -62,6 +61,34 @@ function assertValidChanges(changes) {
 }
 
 /**
+ * Throws unless `card` is a plain object suitable for `restoreCard`.
+ *
+ * @param {unknown} card Candidate hydrate payload.
+ * @returns {void}
+ * @throws {TypeError} When the payload is not a non-array object.
+ */
+function assertValidCardRecord(card) {
+  if (card === null || typeof card !== "object" || Array.isArray(card)) {
+    throw new TypeError(
+      "Invalid card restore: expected an object with id, title, description, and column properties.",
+    );
+  }
+}
+
+/**
+ * Throws unless `id` is a non-empty string.
+ *
+ * @param {unknown} id Candidate card id.
+ * @returns {void}
+ * @throws {TypeError} When the id is not a non-empty string.
+ */
+function assertValidCardId(id) {
+  if (typeof id !== "string" || id.trim().length === 0) {
+    throw new TypeError("Invalid card id: expected a non-empty string.");
+  }
+}
+
+/**
  * Shallow-copy a stored card for handing to a caller.
  *
  * Every card-returning method hands out a copy so callers cannot bypass
@@ -100,14 +127,48 @@ export class KanbanBoard {
     assertValidDescription(description);
     assertValidColumn(column);
 
-    let id = randomUUID();
+    let id = generateId();
     while (this.#cards.has(id)) {
-      id = randomUUID();
+      id = generateId();
     }
 
     const card = { id, title, description, column };
     this.#cards.set(id, card);
     return copyCard(card);
+  }
+
+  /**
+   * Restore a previously persisted card while preserving its existing id.
+   *
+   * Every field is validated with the same rules used by `createCard` before
+   * anything is stored, so invalid or inconsistent persisted data never enters
+   * the board. Duplicate ids are rejected rather than overwriting an existing
+   * card.
+   *
+   * @param {{ id: string, title: string, description: string, column: string }} card
+   *   Stored card representation to hydrate.
+   * @returns {{ id: string, title: string, description: string, column: string }}
+   *   A copy of the restored card.
+   * @throws {TypeError} When the payload or one of its fields is invalid.
+   * @throws {Error} When a card with the same id already exists.
+   */
+  restoreCard(card) {
+    assertValidCardRecord(card);
+
+    const { id, title, description, column } = card;
+
+    assertValidCardId(id);
+    assertValidTitle(title);
+    assertValidDescription(description);
+    assertValidColumn(column);
+
+    if (this.#cards.has(id)) {
+      throw new Error(`Card already exists: ${id}`);
+    }
+
+    const restored = { id, title, description, column };
+    this.#cards.set(id, restored);
+    return copyCard(restored);
   }
 
   /**

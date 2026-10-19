@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A local, framework-free Kanban board with three columns, editable cards, and browser-storage persistence."
+    />
+    <title>Kanban Board</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#board">Skip to board</a>
+
+    <header class="app-header">
+      <div class="app-heading">
+        <h1>Kanban board</h1>
+        <p class="app-subtitle">
+          Plan work, move cards between columns, and keep everything in this browser.
+        </p>
+      </div>
+      <button id="new-card-button" class="button button-primary" type="button">
+        New card
+      </button>
+    </header>
+
+    <main class="app-main">
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <section id="board" class="board" aria-label="Kanban board" tabindex="-1"></section>
+    </main>
+
+    <dialog id="card-dialog" class="dialog" aria-labelledby="card-dialog-title">
+      <form id="card-form" class="dialog-form" novalidate>
+        <h2 id="card-dialog-title">New card</h2>
+
+        <p id="form-error" class="form-error" role="alert" hidden></p>
+
+        <div class="field">
+          <label for="card-title">Title</label>
+          <input
+            id="card-title"
+            name="title"
+            type="text"
+            autocomplete="off"
+            required
+            aria-describedby="card-title-hint form-error"
+          />
+          <p id="card-title-hint" class="hint">Required. Whitespace-only titles are rejected.</p>
+        </div>
+
+        <div class="field">
+          <label for="card-description">Description</label>
+          <textarea id="card-description" name="description" rows="4"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="card-column">Column</label>
+          <select id="card-column" name="column"></select>
+        </div>
+
+        <div class="dialog-actions">
+          <button id="card-cancel" class="button" type="button">Cancel</button>
+          <button id="card-save" class="button button-primary" type="submit">
+            Save card
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog
+      id="delete-dialog"
+      class="dialog dialog-compact"
+      aria-labelledby="delete-dialog-title"
+      aria-describedby="delete-dialog-message"
+    >
+      <h2 id="delete-dialog-title">Delete card?</h2>
+      <p id="delete-dialog-message" class="dialog-message"></p>
+      <div class="dialog-actions">
+        <button id="delete-cancel" class="button" type="button">Cancel</button>
+        <button id="delete-confirm" class="button button-danger" type="button">
+          Delete card
+        </button>
+      </div>
+    </dialog>
+
+    <script type="module" src="src/app.js"></script>
+  </body>
+</html>
